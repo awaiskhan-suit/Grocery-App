@@ -606,7 +606,7 @@ class _FruitsScreenState extends State<FruitsScreen> {
                   );
                 },
               ),
-            ),  //hjhh
+            ),
           ),
         ],
       ),
