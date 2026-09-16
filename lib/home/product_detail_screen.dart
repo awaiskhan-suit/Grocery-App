@@ -1,19 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';
-import 'shopping_cart.dart';
+import 'package:provider/provider.dart';
 
-// ======================================================
-// GLOBAL FAVORITES LIST
-// ======================================================
-List<Map<String, dynamic>> favoriteItems = [];
+import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
+import '../providers/product_provider.dart';
 
 // ======================================================
 // PRODUCT DETAIL MODEL
 // ======================================================
 class ProductDetail {
-  final int id;
+  final String id;
   final String name;
   final String weight;
   final double price;
@@ -37,12 +33,14 @@ class ProductDetail {
 }
 
 // ======================================================
-// ALL PRODUCTS LIST (Vegetables + Fruits)
+// ALL PRODUCTS LIST
 // ======================================================
 List<ProductDetail> allProductDetails = [
-  // ===== Vegetables =====
+  // ====================================================
+  // VEGETABLES
+  // ====================================================
   ProductDetail(
-    id: 1,
+    id: 'v1',
     name: 'Fresh Tomato',
     weight: '1 dozen',
     price: 8.00,
@@ -54,7 +52,7 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFFFEBEE',
   ),
   ProductDetail(
-    id: 2,
+    id: 'v2',
     name: 'Onion',
     weight: '2.0 lbs',
     price: 7.00,
@@ -66,7 +64,7 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFFFF3E0',
   ),
   ProductDetail(
-    id: 3,
+    id: 'v3',
     name: 'Potato',
     weight: '1.50 lbs',
     price: 9.90,
@@ -78,7 +76,7 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFFFF8E1',
   ),
   ProductDetail(
-    id: 4,
+    id: 'v4',
     name: 'Carrot',
     weight: '5.0 lbs',
     price: 7.05,
@@ -90,9 +88,11 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFFFF3E0',
   ),
 
-  // ===== Fruits =====
+  // ====================================================
+  // FRUITS
+  // ====================================================
   ProductDetail(
-    id: 5,
+    id: 'f1',
     name: 'Fresh Peach',
     weight: 'dozen',
     price: 8.00,
@@ -104,7 +104,7 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFFFEBEE',
   ),
   ProductDetail(
-    id: 6,
+    id: 'f2',
     name: 'Avocado',
     weight: '2.0 lbs',
     price: 7.00,
@@ -116,7 +116,7 @@ List<ProductDetail> allProductDetails = [
     bgColor: '0xFFE8F5E9',
   ),
   ProductDetail(
-    id: 7,
+    id: 'f3',
     name: 'Pineapple',
     weight: '1.50 lbs',
     price: 9.90,
@@ -135,155 +135,116 @@ List<ProductDetail> allProductDetails = [
 class ProductDetailScreen extends StatefulWidget {
   final ProductDetail product;
 
-  const ProductDetailScreen({Key? key, required this.product})
-      : super(key: key);
+  const ProductDetailScreen({
+    Key? key,
+    required this.product,
+  }) : super(key: key);
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  static const String _favoritesKey = 'saved_favorites';
-  static const String _cartKey = 'saved_cart_items';
-
   int quantity = 1;
-  late bool isFavorite;
+  bool isFavorite = false;
 
   @override
   void initState() {
     super.initState();
-    isFavorite = _checkIsFavorite(widget.product.id);
-    _loadPersistedData();
+    _loadFavoriteStatus();
   }
 
-  // Safe check for favorite ID comparison (String vs int)
-  bool _checkIsFavorite(int productId) {
-    return favoriteItems.any((item) => item['id'].toString() == productId.toString());
-  }
+  // ======================================================
+  // LOAD FAVORITE STATUS
+  // ======================================================
+  Future<void> _loadFavoriteStatus() async {
+    final favoritesProvider = context.read<FavoritesProvider>();
 
-  // Load persistent state from SharedPreferences on screen startup
-  Future<void> _loadPersistedData() async {
-    final prefs = await SharedPreferences.getInstance();
+    // Ensure favorites are loaded from SharedPreferences
+    await favoritesProvider.loadPersistedFavorites();
 
-    // 1. Load Favorites
-    final List<String> savedFavsJson = prefs.getStringList(_favoritesKey) ?? [];
-    favoriteItems.clear();
-    for (String itemString in savedFavsJson) {
-      try {
-        final Map<String, dynamic> itemMap = jsonDecode(itemString);
-        favoriteItems.add(itemMap);
-      } catch (e) {}
-    }
+    if (!mounted) return;
 
-    // 2. Load Cart Items
-    final List<String> savedCartJson = prefs.getStringList(_cartKey) ?? [];
-    cartItems.clear();
-    for (String itemString in savedCartJson) {
-      try {
-        final Map<String, dynamic> itemMap = jsonDecode(itemString);
-        cartItems.add(itemMap);
-      } catch (e) {}
-    }
-
-    // 3. Sync local state
-    if (mounted) {
-      setState(() {
-        isFavorite = _checkIsFavorite(widget.product.id);
-      });
-    }
-  }
-
-  // Save favorites list to SharedPreferences
-  Future<void> _saveFavoritesToPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<String> favsJson = favoriteItems.map((item) {
-      final Map<String, dynamic> savableMap = Map.from(item);
-      savableMap['id'] = int.tryParse(item['id'].toString()) ?? item['id'];
-      savableMap.remove('bgColor');
-      return jsonEncode(savableMap);
-    }).toList();
-
-    await prefs.setStringList(_favoritesKey, favsJson);
-  }
-
-  // Save cart list to SharedPreferences
-  Future<void> _saveCartToPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<String> cartJson = cartItems.map((item) {
-      final Map<String, dynamic> savableMap = Map.from(item);
-      savableMap['id'] = item['id'].toString();
-      savableMap.remove('bgColor');
-      return jsonEncode(savableMap);
-    }).toList();
-
-    await prefs.setStringList(_cartKey, cartJson);
-  }
-
-  // Toggle favorite and sync to global list + storage
-  void _toggleFavorite(ProductDetail product) {
     setState(() {
-      isFavorite = !isFavorite;
+      isFavorite = favoritesProvider.isFavorite(widget.product.id);
+    });
+  }
+
+  // ======================================================
+  // TOGGLE FAVORITE
+  // ======================================================
+  Future<void> _toggleFavorite() async {
+    final favoritesProvider = context.read<FavoritesProvider>();
+
+    await favoritesProvider.toggleFavoriteById(widget.product.id);
+
+    if (!mounted) return;
+
+    final bool newStatus = favoritesProvider.isFavorite(widget.product.id);
+
+    setState(() {
+      isFavorite = newStatus;
     });
 
-    if (isFavorite) {
-      favoriteItems.add({
-        'id': product.id,
-        'title': product.name,
-        'unit': product.weight,
-        'price': '\$${product.price.toStringAsFixed(2)}',
-        'imagePath': product.image,
-      });
-      _showSnackBar('${product.name} added to favorites', Colors.green);
-    } else {
-      favoriteItems.removeWhere(
-              (item) => item['id'].toString() == product.id.toString());
-      _showSnackBar('${product.name} removed from favorites', Colors.redAccent);
-    }
-
-    // Persist favorites
-    _saveFavoritesToPrefs();
-
-    // Sync state with home screen list if available
-    try {
-      final mainProduct = products.firstWhere(
-            (p) => p.title.toLowerCase().contains(product.name.toLowerCase()),
-      );
-      mainProduct.isFavorite = isFavorite;
-    } catch (e) {}
+    _showSnackBar(
+      newStatus
+          ? '${widget.product.name} added to favorites'
+          : '${widget.product.name} removed from favorites',
+      newStatus ? Colors.green : Colors.redAccent,
+    );
   }
 
-  // Add product to global Cart + storage
-  void _addToCart(ProductDetail product) {
-    final existingIndex = cartItems.indexWhere(
-          (item) => item['id'].toString() == product.id.toString(),
+  // ======================================================
+  // ADD TO CART (using CartProvider)
+  // ======================================================
+  Future<void> _addToCart() async {
+    final cartProvider = context.read<CartProvider>();
+    final product = widget.product;
+
+    // Create a temporary ProductItem that CartProvider understands
+    final ProductItem tempProduct = ProductItem(
+      id: product.id,
+      name: product.name,
+      weight: product.weight,
+      price: product.price,
+      imagePath: product.image,
+      tag: '',
+      bgColor: Color(int.parse(product.bgColor)),
+      description: product.description,
+      category: '',
     );
 
-    final cartData = {
-      'id': product.id.toString(),
-      'title': product.name,
-      'unitPrice': product.price,
-      'price': '\$${product.price.toStringAsFixed(2)} x $quantity',
-      'unit': product.weight,
-      'quantity': quantity,
-      'imagePath': product.image,
-    };
-
-    if (existingIndex >= 0) {
-      cartItems[existingIndex]['quantity'] += quantity;
-      cartItems[existingIndex]['price'] =
-      '\$${product.price.toStringAsFixed(2)} x ${cartItems[existingIndex]['quantity']}';
+    // If item is already in cart → increment the required number of times
+    if (cartProvider.isInCart(product.id)) {
+      for (int i = 0; i < quantity; i++) {
+        await cartProvider.incrementQuantity(product.id);
+      }
     } else {
-      cartItems.add(cartData);
+      // First time adding
+      await cartProvider.addToCart(tempProduct);
+
+      // If user selected more than 1, increment the rest
+      for (int i = 1; i < quantity; i++) {
+        await cartProvider.incrementQuantity(product.id);
+      }
     }
 
-    // Persist cart items
-    _saveCartToPrefs();
+    if (!mounted) return;
 
-    _showSnackBar('${product.name} added to cart', Colors.green);
+    _showSnackBar(
+      '${product.name} added to cart',
+      Colors.green,
+    );
   }
 
+  // ======================================================
+  // SNACKBAR
+  // ======================================================
   void _showSnackBar(String message, Color bgColor) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -303,6 +264,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ======================================================
+  // BUILD
+  // ======================================================
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -313,12 +277,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // ==================================================
+            // MAIN CONTENT
+            // ==================================================
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ================= Circular Header Image =================
+                    // ==========================================
+                    // CIRCULAR HEADER IMAGE
+                    // ==========================================
                     Stack(
                       children: [
                         Container(
@@ -339,17 +308,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     height: 150,
                                     width: 150,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.broken_image,
-                                      size: 80,
-                                      color: Colors.grey,
-                                    ),
+                                    errorBuilder: (_, __, ___) {
+                                      return const Icon(
+                                        Icons.broken_image,
+                                        size: 80,
+                                        color: Colors.grey,
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
                             ),
                           ),
                         ),
+
+                        // ======================================
+                        // BACK BUTTON
+                        // ======================================
                         Positioned(
                           top: 16,
                           left: 16,
@@ -370,12 +345,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
 
-                    // ================= Product Details =================
+                    // ==========================================
+                    // PRODUCT DETAILS
+                    // ==========================================
                     Padding(
                       padding: const EdgeInsets.all(20.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // ====================================
+                          // PRICE + FAVORITE
+                          // ====================================
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -394,10 +374,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       : Icons.favorite_border,
                                   color: isFavorite ? Colors.red : Colors.grey,
                                 ),
-                                onPressed: () => _toggleFavorite(product),
+                                onPressed: _toggleFavorite,
                               ),
                             ],
                           ),
+
+                          // ====================================
+                          // PRODUCT NAME
+                          // ====================================
                           Text(
                             product.name,
                             style: const TextStyle(
@@ -405,7 +389,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+
                           const SizedBox(height: 4),
+
+                          // ====================================
+                          // WEIGHT
+                          // ====================================
                           Text(
                             product.weight,
                             style: const TextStyle(
@@ -413,9 +402,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               color: Colors.grey,
                             ),
                           ),
+
                           const SizedBox(height: 10),
 
-                          // Rating
+                          // ====================================
+                          // RATING
+                          // ====================================
                           Row(
                             children: [
                               Text(
@@ -447,9 +439,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ],
                           ),
+
                           const SizedBox(height: 16),
 
-                          // Description
+                          // ====================================
+                          // DESCRIPTION
+                          // ====================================
                           Text(
                             product.description,
                             style: const TextStyle(
@@ -466,7 +461,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
 
-            // ================= Bottom Action Controls =================
+            // ==================================================
+            // BOTTOM ACTION CONTROLS
+            // ==================================================
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20.0,
@@ -474,7 +471,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               child: Column(
                 children: [
-                  // Quantity Selector
+                  // ============================================
+                  // QUANTITY SELECTOR
+                  // ============================================
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -504,7 +503,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                               onPressed: () {
                                 if (quantity > 1) {
-                                  setState(() => quantity--);
+                                  setState(() {
+                                    quantity--;
+                                  });
                                 }
                               },
                             ),
@@ -522,7 +523,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 color: Color(0xFF4CAF50),
                               ),
                               onPressed: () {
-                                setState(() => quantity++);
+                                setState(() {
+                                  quantity++;
+                                });
                               },
                             ),
                           ],
@@ -530,9 +533,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 12),
 
-                  // Add to Cart Button
+                  // ============================================
+                  // ADD TO CART BUTTON
+                  // ============================================
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -544,7 +550,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         elevation: 0,
                       ),
-                      onPressed: () => _addToCart(product),
+                      onPressed: _addToCart,
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

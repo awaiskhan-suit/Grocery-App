@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'fruit_provider.dart';
-import 'product_provider.dart' hide ProductProvider;
+
+import '../providers/favorites_provider.dart';
+import '../providers/fruit_provider.dart';
+import '../providers/cart_provider.dart';
 import 'product_detail_screen.dart';
+import '../providers/product_provider.dart';
 
 class FruitsScreen extends StatefulWidget {
   const FruitsScreen({Key? key}) : super(key: key);
@@ -12,16 +15,36 @@ class FruitsScreen extends StatefulWidget {
 }
 
 class _FruitsScreenState extends State<FruitsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  String _searchText = '';
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FruitProvider>().loadPersistedData();
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchText = _searchController.text.trim().toLowerCase();
+      });
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ======================================================
+  // SHOW SNACKBAR
+  // ======================================================
+
   void _showSnackBar(String message, Color bgColor) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -41,58 +64,182 @@ class _FruitsScreenState extends State<FruitsScreen> {
     );
   }
 
-  Future<void> _navigateToProductDetail(FruitProduct fruit) async {
-    final selectedProduct = allProductDetails.firstWhere(
-          (p) => p.name.trim().toLowerCase() == fruit.name.trim().toLowerCase(),
-      orElse: () => allProductDetails.first,
-    );
+  // ======================================================
+  // OPEN PRODUCT DETAIL
+  // ======================================================
+
+  Future<void> _navigateToProductDetail(ProductItem fruit) async {
+    ProductDetail? selectedProduct;
+
+    try {
+      selectedProduct = allProductDetails.firstWhere(
+            (product) =>
+        product.name.trim().toLowerCase() ==
+            fruit.name.trim().toLowerCase(),
+      );
+    } catch (_) {
+      selectedProduct = null;
+    }
+
+    if (selectedProduct == null) {
+      _showSnackBar(
+        '${fruit.name} details are not available',
+        Colors.redAccent,
+      );
+      return;
+    }
 
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ProductDetailScreen(
-          product: selectedProduct,
+          product: selectedProduct!,
         ),
       ),
     );
+  }
 
-    if (mounted) {
-      context.read<FruitProvider>().loadPersistedData();
+  // ======================================================
+  // TOGGLE FAVORITE
+  // ======================================================
+
+  Future<void> _toggleFavorite(
+      ProductItem fruit,
+      FavoritesProvider favoritesProvider,
+      ) async {
+    await favoritesProvider.toggleFavoriteById(fruit.id);
+
+    if (!mounted) return;
+
+    final bool isFavorite = favoritesProvider.isFavorite(fruit.id);
+
+    _showSnackBar(
+      isFavorite
+          ? '${fruit.name} added to favorites'
+          : '${fruit.name} removed from favorites',
+      isFavorite ? Colors.green : Colors.redAccent,
+    );
+  }
+
+  // ======================================================
+  // ADD TO CART
+  // ======================================================
+
+  Future<void> _addToCart(ProductItem fruit) async {
+    final cartProvider = context.read<CartProvider>();
+
+    await cartProvider.addToCart(fruit);
+
+    if (!mounted) return;
+
+    _showSnackBar(
+      '${fruit.name} added to the cart',
+      Colors.green,
+    );
+  }
+
+  // ======================================================
+  // INCREMENT QUANTITY
+  // ======================================================
+
+  Future<void> _incrementQuantity(String productId) async {
+    final cartProvider = context.read<CartProvider>();
+
+    await cartProvider.incrementQuantity(productId);
+  }
+
+  // ======================================================
+  // DECREMENT QUANTITY
+  // ======================================================
+
+  Future<void> _decrementQuantity(ProductItem fruit) async {
+    final cartProvider = context.read<CartProvider>();
+
+    final bool wasRemoved =
+    await cartProvider.decrementQuantity(fruit.id);
+
+    if (!mounted) return;
+
+    if (wasRemoved) {
+      _showSnackBar(
+        '${fruit.name} removed from the cart',
+        Colors.redAccent,
+      );
     }
   }
+
+  // ======================================================
+  // BUILD
+  // ======================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
+
+      // ====================================================
+      // APP BAR
+      // ====================================================
+
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+          ),
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
           'Fruits',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
       ),
+
+      // ====================================================
+      // BODY
+      // ====================================================
+
       body: Column(
         children: [
-          // Search Bar
+          // ==================================================
+          // SEARCH BAR
+          // ==================================================
+
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search fruits...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                hintStyle: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.grey[400],
+                ),
+                suffixIcon: _searchText.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
+                    : null,
                 filled: true,
                 fillColor: const Color(0xFFF2F4F7),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -101,16 +248,69 @@ class _FruitsScreenState extends State<FruitsScreen> {
             ),
           ),
 
-          // Fruits Grid via Consumer
+          // ==================================================
+          // FRUITS GRID
+          // ==================================================
+
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Consumer<FruitProvider>(
-                builder: (context, provider, child) {
-                  final fruitProducts = provider.fruitProducts;
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+              ),
+              child: Consumer3<FruitProvider, FavoritesProvider,
+                  CartProvider>(
+                builder: (
+                    context,
+                    fruitProvider,
+                    favoritesProvider,
+                    cartProvider,
+                    child,
+                    ) {
+                  // ------------------------------------------------
+                  // ALL FRUITS
+                  // ------------------------------------------------
+
+                  final allFruits = fruitProvider.fruitProducts;
+
+                  // ------------------------------------------------
+                  // SEARCH FILTER
+                  // ------------------------------------------------
+
+                  final fruitProducts = allFruits.where((fruit) {
+                    if (_searchText.isEmpty) {
+                      return true;
+                    }
+
+                    return fruit.name
+                        .toLowerCase()
+                        .contains(_searchText);
+                  }).toList();
+
+                  // ------------------------------------------------
+                  // EMPTY SEARCH RESULT
+                  // ------------------------------------------------
+
+                  if (fruitProducts.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No fruits found',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  }
+
+                  // ------------------------------------------------
+                  // GRID
+                  // ------------------------------------------------
 
                   return GridView.builder(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(
+                      top: 12,
+                      bottom: 20,
+                    ),
                     itemCount: fruitProducts.length,
                     gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
@@ -121,7 +321,34 @@ class _FruitsScreenState extends State<FruitsScreen> {
                     ),
                     itemBuilder: (context, index) {
                       final fruit = fruitProducts[index];
-                      final double totalPrice = fruit.price * fruit.quantity;
+
+                      // --------------------------------------------
+                      // FAVORITE STATUS
+                      // --------------------------------------------
+
+                      final bool isFavorite =
+                      favoritesProvider.isFavorite(fruit.id);
+
+                      // --------------------------------------------
+                      // CART STATUS
+                      // --------------------------------------------
+
+                      final bool inCart =
+                      cartProvider.isInCart(fruit.id);
+
+                      // --------------------------------------------
+                      // CART QUANTITY
+                      // --------------------------------------------
+
+                      final int quantity =
+                      cartProvider.getQuantity(fruit.id);
+
+                      // --------------------------------------------
+                      // TOTAL PRICE
+                      // --------------------------------------------
+
+                      final double totalPrice =
+                          fruit.price * quantity;
 
                       return Container(
                         decoration: BoxDecoration(
@@ -130,13 +357,17 @@ class _FruitsScreenState extends State<FruitsScreen> {
                         ),
                         child: Stack(
                           children: [
-                            // Tag
+                            // ======================================
+                            // TAG
+                            // ======================================
+
                             if (fruit.tag.isNotEmpty)
                               Positioned(
                                 top: 0,
                                 left: 0,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
+                                  padding:
+                                  const EdgeInsets.symmetric(
                                     horizontal: 6,
                                     vertical: 2,
                                   ),
@@ -144,9 +375,11 @@ class _FruitsScreenState extends State<FruitsScreen> {
                                     color: fruit.tag == 'NEW'
                                         ? Colors.orange.shade100
                                         : Colors.red.shade100,
-                                    borderRadius: const BorderRadius.only(
+                                    borderRadius:
+                                    const BorderRadius.only(
                                       topLeft: Radius.circular(8),
-                                      bottomRight: Radius.circular(8),
+                                      bottomRight:
+                                      Radius.circular(8),
                                     ),
                                   ),
                                   child: Text(
@@ -162,62 +395,72 @@ class _FruitsScreenState extends State<FruitsScreen> {
                                 ),
                               ),
 
-                            // Favorite Icon Button
+                            // ======================================
+                            // FAVORITE BUTTON
+                            // ======================================
+
                             Positioned(
                               top: 4,
                               right: 4,
                               child: IconButton(
                                 icon: Icon(
-                                  fruit.isFavorite
+                                  isFavorite
                                       ? Icons.favorite
                                       : Icons.favorite_border,
-                                  color: fruit.isFavorite
+                                  color: isFavorite
                                       ? Colors.red
                                       : Colors.grey,
                                   size: 18,
                                 ),
                                 onPressed: () {
-                                  provider.toggleFruitFavorite(fruit);
-                                  _showSnackBar(
-                                    fruit.isFavorite
-                                        ? '${fruit.name} added to favorites'
-                                        : '${fruit.name} removed from favorites',
-                                    fruit.isFavorite
-                                        ? Colors.green
-                                        : Colors.redAccent,
+                                  _toggleFavorite(
+                                    fruit,
+                                    favoritesProvider,
                                   );
                                 },
                               ),
                             ),
 
-                            // Main Card Details
+                            // ======================================
+                            // PRODUCT CONTENT
+                            // ======================================
+
                             Padding(
                               padding: const EdgeInsets.all(12.0),
                               child: Column(
                                 children: [
                                   const SizedBox(height: 12),
 
-                                  // Image Container with Detail Navigation
+                                  // ==================================
+                                  // PRODUCT IMAGE
+                                  // ==================================
+
                                   Expanded(
                                     child: GestureDetector(
-                                      onTap: () =>
-                                          _navigateToProductDetail(fruit),
+                                      onTap: () {
+                                        _navigateToProductDetail(
+                                          fruit,
+                                        );
+                                      },
                                       child: Container(
                                         width: 80,
                                         height: 80,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: Colors.orange.shade50,
+                                          color:
+                                          Colors.orange.shade50,
                                         ),
                                         child: ClipOval(
                                           child: Image.asset(
                                             fruit.imagePath,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                            const Icon(
-                                              Icons.broken_image,
-                                              size: 40,
-                                            ),
+                                            errorBuilder:
+                                                (_, __, ___) {
+                                              return const Icon(
+                                                Icons.broken_image,
+                                                size: 40,
+                                              );
+                                            },
                                           ),
                                         ),
                                       ),
@@ -226,18 +469,25 @@ class _FruitsScreenState extends State<FruitsScreen> {
 
                                   const SizedBox(height: 8),
 
-                                  // Total Price Display
+                                  // ==================================
+                                  // TOTAL PRICE
+                                  // ==================================
+
                                   Text(
-                                    "\$${totalPrice.toStringAsFixed(2)}",
+                                    '\$${totalPrice.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       color: Color(0xFF4CAF50),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
                                   ),
+
                                   const SizedBox(height: 2),
 
-                                  // Name
+                                  // ==================================
+                                  // PRODUCT NAME
+                                  // ==================================
+
                                   Text(
                                     fruit.name,
                                     style: const TextStyle(
@@ -248,9 +498,13 @@ class _FruitsScreenState extends State<FruitsScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+
                                   const SizedBox(height: 2),
 
-                                  // Weight
+                                  // ==================================
+                                  // WEIGHT
+                                  // ==================================
+
                                   Text(
                                     fruit.weight,
                                     style: const TextStyle(
@@ -261,86 +515,109 @@ class _FruitsScreenState extends State<FruitsScreen> {
 
                                   const SizedBox(height: 8),
 
-                                  // Cart Controls
+                                  // ==================================
+                                  // CART CONTROLS
+                                  // ==================================
+
                                   SizedBox(
                                     height: 36,
-                                    child: fruit.inCart
-                                        ? Row(
+                                    child: !inCart
+                                        ? InkWell(
+                                      onTap: () {
+                                        _addToCart(fruit);
+                                      },
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment
+                                            .center,
+                                        children: [
+                                          Icon(
+                                            Icons
+                                                .shopping_bag_outlined,
+                                            size: 14,
+                                            color: Color(
+                                              0xFF4CAF50,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Add to cart',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight:
+                                              FontWeight
+                                                  .w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                        : Row(
                                       mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
+                                      MainAxisAlignment
+                                          .spaceEvenly,
                                       children: [
+                                        // ==========================
+                                        // DECREASE
+                                        // ==========================
+
                                         IconButton(
-                                          padding: EdgeInsets.zero,
+                                          padding:
+                                          EdgeInsets.zero,
                                           constraints:
                                           const BoxConstraints(),
                                           icon: const Icon(
                                             Icons.remove,
                                             size: 18,
-                                            color: Color(0xFF4CAF50),
+                                            color: Color(
+                                              0xFF4CAF50,
+                                            ),
                                           ),
                                           onPressed: () {
-                                            bool wasRemoved = provider
-                                                .decrementFruitCartQuantity(
-                                                fruit);
-                                            if (wasRemoved) {
-                                              _showSnackBar(
-                                                '${fruit.name} removed from the cart',
-                                                Colors.redAccent,
-                                              );
-                                            }
+                                            _decrementQuantity(
+                                              fruit,
+                                            );
                                           },
                                         ),
+
+                                        // ==========================
+                                        // QUANTITY
+                                        // ==========================
+
                                         Text(
-                                          "${fruit.quantity}",
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                          quantity.toString(),
+                                          style:
+                                          const TextStyle(
+                                            fontWeight:
+                                            FontWeight
+                                                .bold,
                                             fontSize: 14,
                                           ),
                                         ),
+
+                                        // ==========================
+                                        // INCREASE
+                                        // ==========================
+
                                         IconButton(
-                                          padding: EdgeInsets.zero,
+                                          padding:
+                                          EdgeInsets.zero,
                                           constraints:
                                           const BoxConstraints(),
                                           icon: const Icon(
                                             Icons.add,
                                             size: 18,
-                                            color: Color(0xFF4CAF50),
+                                            color: Color(
+                                              0xFF4CAF50,
+                                            ),
                                           ),
                                           onPressed: () {
-                                            provider
-                                                .incrementFruitCartQuantity(
-                                                fruit);
+                                            _incrementQuantity(
+                                              fruit.id,
+                                            );
                                           },
                                         ),
                                       ],
-                                    )
-                                        : InkWell(
-                                      onTap: () {
-                                        provider.addFruitToCart(fruit);
-                                        _showSnackBar(
-                                          '${fruit.name} added to the cart',
-                                          Colors.green,
-                                        );
-                                      },
-                                      child: const Row(
-                                        mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.shopping_bag_outlined,
-                                            size: 14,
-                                            color: Color(0xFF4CAF50),
-                                          ),
-                                          SizedBox(width: 4),
-                                          Text(
-                                            "Add to cart",
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ),
                                 ],

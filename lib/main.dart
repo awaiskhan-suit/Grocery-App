@@ -1,29 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:grocery/providers/category_provider.dart';
 import 'package:provider/provider.dart';
 
-// Import your splash / initial screen
+// Splash / Initial Screen
 import 'package:grocery/splashes/on_boarding_screen.dart';
 
-// Import your Provider classes
-import 'home/product_provider.dart';
-import 'home/fruit_provider.dart';
-// Uncomment these if you also created dedicated Cart / Favorite providers:
-// import 'home/cart_provider.dart';
-// import 'home/favorite_provider.dart';
+// Providers
+import 'providers/product_provider.dart';
+import 'providers/fruit_provider.dart';
+import 'providers/favorites_provider.dart';
+import 'providers/cart_provider.dart'; // ← Added
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
   await Firebase.initializeApp();
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ProductProvider()),
-        ChangeNotifierProvider(create: (_) => FruitProvider()),
-        // Add additional providers here if separated:
-        // ChangeNotifierProvider(create: (_) => CartProvider()),
-        // ChangeNotifierProvider(create: (_) => FavoriteProvider()),
+        // Product Provider
+        ChangeNotifierProvider(
+          create: (_) => ProductProvider(),
+        ),
+
+        // Fruit Provider
+        ChangeNotifierProvider(
+          create: (_) => FruitProvider(),
+        ),
+
+        // Favorites Provider
+        ChangeNotifierProvider(
+          create: (_) => FavoritesProvider(),
+        ),
+
+        // Cart Provider (Important)
+        ChangeNotifierProvider(
+          create: (_) => CartProvider(),
+        ),
+
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],
       child: const MyApp(),
     ),
@@ -33,14 +51,27 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static const Color brandGreen = Color(0xFF7AC142);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Grocery App',
       theme: ThemeData(
-        primarySwatch: Colors.green,
         useMaterial3: false,
+        primaryColor: brandGreen,
+        scaffoldBackgroundColor: const Color(0xFFF9F9F9),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: brandGreen,
+          primary: brandGreen,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: brandGreen,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+        ),
       ),
       home: const SplashOnboardingScreen(),
     );

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'product_provider.dart';
+
+import '../providers/favorites_provider.dart';
+import '../providers/product_provider.dart';
+import '../providers/cart_provider.dart';
 import 'product_detail_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -11,16 +14,36 @@ class ProductsScreen extends StatefulWidget {
 }
 
 class _ProductsScreenState extends State<ProductsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  String _searchText = '';
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProductProvider>().loadPersistedData();
+
+    _searchController.addListener(() {
+      setState(() {
+        _searchText = _searchController.text.trim().toLowerCase();
+      });
     });
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ============================================================
+  // SNACKBAR
+  // ============================================================
+
   void _showSnackBar(String message, Color bgColor) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -40,30 +63,120 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  Future<void> _navigateToProductDetail(VegetableProduct product) async {
-    final selectedProduct = allProductDetails.firstWhere(
-          (p) => p.name.trim().toLowerCase() == product.name.trim().toLowerCase(),
-      orElse: () => allProductDetails.first,
-    );
+  // ============================================================
+  // NAVIGATE TO PRODUCT DETAILS
+  // ============================================================
+
+  Future<void> _navigateToProductDetail(ProductItem product) async {
+    ProductDetail? selectedProduct;
+
+    try {
+      selectedProduct = allProductDetails.firstWhere(
+            (p) =>
+        p.name.trim().toLowerCase() ==
+            product.name.trim().toLowerCase(),
+      );
+    } catch (_) {
+      selectedProduct = null;
+    }
+
+    if (selectedProduct == null) {
+      _showSnackBar(
+        '${product.name} details are not available',
+        Colors.redAccent,
+      );
+      return;
+    }
 
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ProductDetailScreen(
-          product: selectedProduct,
+          product: selectedProduct!,
         ),
       ),
     );
+  }
 
-    if (mounted) {
-      context.read<ProductProvider>().loadPersistedData();
+  // ============================================================
+  // TOGGLE FAVORITE
+  // ============================================================
+
+  Future<void> _toggleFavorite(ProductItem product) async {
+    final favoritesProvider = context.read<FavoritesProvider>();
+
+    await favoritesProvider.toggleFavoriteById(product.id);
+
+    if (!mounted) return;
+
+    final bool isFavorite = favoritesProvider.isFavorite(product.id);
+
+    _showSnackBar(
+      isFavorite
+          ? '${product.name} added to favorites'
+          : '${product.name} removed from favorites',
+      isFavorite ? Colors.green : Colors.redAccent,
+    );
+  }
+
+  // ============================================================
+  // ADD TO CART
+  // ============================================================
+
+  Future<void> _addToCart(ProductItem product) async {
+    final cartProvider = context.read<CartProvider>();
+
+    await cartProvider.addToCart(product);
+
+    if (!mounted) return;
+
+    _showSnackBar(
+      '${product.name} added to the cart',
+      Colors.green,
+    );
+  }
+
+  // ============================================================
+  // INCREASE QUANTITY
+  // ============================================================
+
+  Future<void> _incrementQuantity(String productId) async {
+    final cartProvider = context.read<CartProvider>();
+    await cartProvider.incrementQuantity(productId);
+  }
+
+  // ============================================================
+  // DECREASE QUANTITY
+  // ============================================================
+
+  Future<void> _decrementQuantity(ProductItem product) async {
+    final cartProvider = context.read<CartProvider>();
+
+    final bool wasRemoved =
+    await cartProvider.decrementQuantity(product.id);
+
+    if (!mounted) return;
+
+    if (wasRemoved) {
+      _showSnackBar(
+        '${product.name} removed from the cart',
+        Colors.redAccent,
+      );
     }
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
+
+      // ========================================================
+      // APP BAR
+      // ========================================================
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.green,
@@ -74,21 +187,45 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ),
         title: const Text(
           'Vegetables',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
       ),
+
+      // ========================================================
+      // BODY
+      // ========================================================
       body: Column(
         children: [
-          // Search Bar
+          // ======================================================
+          // SEARCH BAR
+          // ======================================================
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search vegetables...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                hintStyle: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.grey[400],
+                ),
+                suffixIcon: _searchText.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
+                    : null,
                 filled: true,
                 fillColor: const Color(0xFFF2F4F7),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -100,16 +237,54 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
 
-          // Products Grid via Consumer
+          // ======================================================
+          // PRODUCTS GRID
+          // ======================================================
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Consumer<ProductProvider>(
-                builder: (context, provider, child) {
-                  final vegetableProducts = provider.vegetableProducts;
+              child: Consumer3<ProductProvider, FavoritesProvider,
+                  CartProvider>(
+                builder: (
+                    context,
+                    productProvider,
+                    favoritesProvider,
+                    cartProvider,
+                    child,
+                    ) {
+                  // ------------------------------------------------
+                  // GET VEGETABLES
+                  // ------------------------------------------------
+                  final allVegetables = productProvider.vegetableProducts;
 
+                  // ------------------------------------------------
+                  // SEARCH FILTER
+                  // ------------------------------------------------
+                  final vegetableProducts = allVegetables.where((product) {
+                    if (_searchText.isEmpty) return true;
+                    return product.name.toLowerCase().contains(_searchText);
+                  }).toList();
+
+                  // ------------------------------------------------
+                  // EMPTY RESULT
+                  // ------------------------------------------------
+                  if (vegetableProducts.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No vegetables found',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  }
+
+                  // ------------------------------------------------
+                  // GRID
+                  // ------------------------------------------------
                   return GridView.builder(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(top: 12, bottom: 20),
                     itemCount: vegetableProducts.length,
                     gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
@@ -121,6 +296,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     itemBuilder: (context, index) {
                       final product = vegetableProducts[index];
 
+                      final bool isFavorite =
+                      favoritesProvider.isFavorite(product.id);
+                      final bool isInCart =
+                      cartProvider.isInCart(product.id);
+                      final int quantity =
+                      cartProvider.getQuantity(product.id);
+
                       return Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -128,7 +310,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ),
                         child: Stack(
                           children: [
-                            // Tag
+                            // ======================================
+                            // TAG
+                            // ======================================
                             if (product.tag.isNotEmpty)
                               Positioned(
                                 top: 0,
@@ -160,42 +344,36 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 ),
                               ),
 
-                            // Favorite Button
+                            // ======================================
+                            // FAVORITE BUTTON
+                            // ======================================
                             Positioned(
                               top: 4,
                               right: 4,
                               child: IconButton(
                                 icon: Icon(
-                                  product.isFavorite
+                                  isFavorite
                                       ? Icons.favorite
                                       : Icons.favorite_border,
-                                  color: product.isFavorite
-                                      ? Colors.red
-                                      : Colors.grey,
+                                  color: isFavorite ? Colors.red : Colors.grey,
                                   size: 18,
                                 ),
-                                onPressed: () {
-                                  provider.toggleFavorite(product);
-                                  _showSnackBar(
-                                    product.isFavorite
-                                        ? '${product.name} added to favorites'
-                                        : '${product.name} removed from favorites',
-                                    product.isFavorite
-                                        ? Colors.green
-                                        : Colors.redAccent,
-                                  );
-                                },
+                                onPressed: () => _toggleFavorite(product),
                               ),
                             ),
 
-                            // Main Content with Image Provider Access
+                            // ======================================
+                            // MAIN CONTENT
+                            // ======================================
                             Padding(
                               padding: const EdgeInsets.all(12.0),
                               child: Column(
                                 children: [
                                   const SizedBox(height: 12),
 
-                                  // Image Navigation
+                                  // ==================================
+                                  // PRODUCT IMAGE
+                                  // ==================================
                                   Expanded(
                                     child: GestureDetector(
                                       onTap: () =>
@@ -211,11 +389,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           child: Image.asset(
                                             product.imagePath,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                            const Icon(
-                                              Icons.broken_image,
-                                              size: 40,
-                                            ),
+                                            errorBuilder: (_, __, ___) {
+                                              return const Icon(
+                                                Icons.broken_image,
+                                                size: 40,
+                                              );
+                                            },
                                           ),
                                         ),
                                       ),
@@ -224,18 +403,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
                                   const SizedBox(height: 8),
 
-                                  // Price Display
+                                  // ==================================
+                                  // PRICE
+                                  // ==================================
                                   Text(
-                                    "\$${product.price.toStringAsFixed(2)}",
+                                    '\$${product.price.toStringAsFixed(2)}',
                                     style: const TextStyle(
                                       color: Color(0xFF4CAF50),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
                                   ),
+
                                   const SizedBox(height: 2),
 
-                                  // Name
+                                  // ==================================
+                                  // NAME
+                                  // ==================================
                                   Text(
                                     product.name,
                                     style: const TextStyle(
@@ -246,9 +430,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+
                                   const SizedBox(height: 2),
 
-                                  // Weight
+                                  // ==================================
+                                  // WEIGHT
+                                  // ==================================
                                   Text(
                                     product.weight,
                                     style: const TextStyle(
@@ -259,10 +446,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
                                   const SizedBox(height: 8),
 
-                                  // Quantity / Add to Cart
+                                  // ==================================
+                                  // CART CONTROLS
+                                  // ==================================
                                   SizedBox(
                                     height: 36,
-                                    child: product.inCart
+                                    child: isInCart
                                         ? Row(
                                       mainAxisAlignment:
                                       MainAxisAlignment.spaceEvenly,
@@ -276,20 +465,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             size: 18,
                                             color: Color(0xFF4CAF50),
                                           ),
-                                          onPressed: () {
-                                            bool wasRemoved = provider
-                                                .decrementCartQuantity(
-                                                product);
-                                            if (wasRemoved) {
-                                              _showSnackBar(
-                                                '${product.name} removed from the cart',
-                                                Colors.redAccent,
-                                              );
-                                            }
-                                          },
+                                          onPressed: () =>
+                                              _decrementQuantity(product),
                                         ),
                                         Text(
-                                          "${product.quantity}",
+                                          '$quantity',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
@@ -304,21 +484,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             size: 18,
                                             color: Color(0xFF4CAF50),
                                           ),
-                                          onPressed: () {
-                                            provider.incrementCartQuantity(
-                                                product);
-                                          },
+                                          onPressed: () =>
+                                              _incrementQuantity(
+                                                  product.id),
                                         ),
                                       ],
                                     )
                                         : InkWell(
-                                      onTap: () {
-                                        provider.addToCart(product);
-                                        _showSnackBar(
-                                          '${product.name} added to the cart',
-                                          Colors.green,
-                                        );
-                                      },
+                                      onTap: () => _addToCart(product),
                                       child: const Row(
                                         mainAxisAlignment:
                                         MainAxisAlignment.center,
@@ -330,7 +503,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           ),
                                           SizedBox(width: 4),
                                           Text(
-                                            "Add to cart",
+                                            'Add to cart',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
@@ -357,3 +530,4 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 }
+
