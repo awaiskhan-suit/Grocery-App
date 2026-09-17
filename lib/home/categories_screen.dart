@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:grocery/home/products_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/category_provider.dart';
-import 'fruits.dart';
+import '../providers/product_provider.dart';
+import 'category_product_screen.dart';
+
 
 class CategorySelectionScreen extends StatefulWidget {
   const CategorySelectionScreen({Key? key}) : super(key: key);
@@ -14,38 +15,35 @@ class CategorySelectionScreen extends StatefulWidget {
 }
 
 class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
-  int selectedIndex = 0;
+  String? selectedId;
 
   // ============================================================
-  // HANDLE CATEGORY TAP
+  // HANDLE CATEGORY TAP — fully dynamic, keyed by categoryId
   // ============================================================
 
-  void _onCategoryTap(BuildContext context, int index, String title) {
+  void _onCategoryTap(BuildContext context, CategoryItem category) {
     setState(() {
-      selectedIndex = index;
+      selectedId = category.id;
     });
 
-    // ========== NAVIGATION LOGIC ==========
-    if (title == 'Vegetables') {
+    final productProvider = context.read<ProductProvider>();
+    final hasProducts =
+        productProvider.getProductsByCategoryId(category.id).isNotEmpty;
+
+    if (hasProducts) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const ProductsScreen()),
-      );
-    } else if (title == 'Fruits') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const FruitsScreen()),
+        MaterialPageRoute(
+          builder: (_) => CategoryProductsScreen(category: category),
+        ),
       );
     } else {
-      // For other categories that don't have products yet
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$title coming soon!'),
+          content: Text('${category.title} coming soon!'),
           backgroundColor: Colors.orange,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
@@ -59,10 +57,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Categories',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        title: const Text('Categories', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
       ),
       body: Padding(
@@ -71,79 +66,57 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
           builder: (context, categoryProvider, child) {
             final categories = categoryProvider.categories;
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: GridView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: categories.length,
-                    gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 0.85,
-                    ),
-                    itemBuilder: (context, index) {
-                      final item = categories[index];
-                      final isSelected = selectedIndex == index;
+            return GridView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: categories.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+              ),
+              itemBuilder: (context, index) {
+                final item = categories[index];
+                final isSelected = selectedId == item.id;
 
-                      return GestureDetector(
-                        onTap: () => _onCategoryTap(context, index, item.title),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.green
-                                  : Colors.transparent,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 26,
-                                backgroundColor: item.bgColor,
-                                child: Icon(
-                                  item.icon,
-                                  color: item.iconColor,
-                                  size: 26,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                item.title,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                  color: isSelected
-                                      ? Colors.green
-                                      : Colors.black87,
-                                ),
-                              ),
-                            ],
+                return GestureDetector(
+                  onTap: () => _onCategoryTap(context, item),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? Colors.green : Colors.transparent,
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: item.bgColor,
+                          child: Icon(item.icon, color: item.iconColor, size: 26),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          item.title,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? Colors.green : Colors.black87,
                           ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                );
+              },
             );
           },
         ),

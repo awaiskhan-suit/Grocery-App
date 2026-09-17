@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../providers/fruit_provider.dart';
 import '../providers/product_provider.dart';
+import '../providers/category_provider.dart';
+import 'category_product_screen.dart';
 import 'product_detail_screen.dart';
 import 'categories_screen.dart';
 import 'favorites.dart';
@@ -31,45 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
     'assets/images/cap1.PNG',
     'assets/images/ca3.PNG',
     'assets/images/cap4.PNG',
-  ];
-
-  // Categories (same as your old UI)
-  final List<Map<String, dynamic>> categories = [
-    {
-      'name': 'Vegetables',
-      'color': const Color(0xFFE8F5E9),
-      'icon': Icons.eco_outlined,
-    },
-    {
-      'name': 'Fruits',
-      'color': const Color(0xFFFFEBEE),
-      'icon': Icons.apple_outlined,
-    },
-    {
-      'name': 'Beverages',
-      'color': const Color(0xFFFFF8E1),
-      'icon': Icons.local_drink_outlined,
-    },
-    {
-      'name': 'Grocery',
-      'color': const Color(0xFFF3E5F5),
-      'icon': Icons.shopping_bag_outlined,
-    },
-    {
-      'name': 'Edible oil',
-      'color': const Color(0xFFE0F7FA),
-      'icon': Icons.water_drop_outlined,
-    },
-    {
-      'name': 'Fast Food',
-      'color': const Color(0xFFFFF3E0),
-      'icon': Icons.fastfood_outlined,
-    },
-    {
-      'name': 'Cold Drinks',
-      'color': const Color(0xFFE1F5FE),
-      'icon': Icons.local_drink_outlined,
-    },
   ];
 
   @override
@@ -137,9 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       selectedProduct = allProductDetails.firstWhere(
-            (p) =>
-        p.id == product.id ||
-            p.name.trim().toLowerCase() == product.name.trim().toLowerCase(),
+            (p) => p.id == product.id,
       );
     } catch (_) {
       selectedProduct = null;
@@ -207,6 +167,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (removed) {
       _showSnackBar('${product.name} removed from cart', Colors.redAccent);
+    }
+  }
+
+  // ======================================================
+  // CATEGORY CHIP TAP (quick access row)
+  // ======================================================
+  void _onCategoryTap(CategoryItem category) {
+    final productProvider = context.read<ProductProvider>();
+    final products = productProvider.getProductsByCategoryId(category.id);
+
+    if (products.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CategoryProductsScreen(category: category), // ← fixed
+        ),
+      );
+    } else {
+      _showSnackBar('${category.title} coming soon!', Colors.orange);
     }
   }
 
@@ -340,36 +319,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 12),
 
+            // Quick-access category row, driven by CategoryProvider
             SizedBox(
               height: 80,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  final category = categories[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: category['color'],
-                          child: Icon(
-                            category['icon'],
-                            color: Colors.black54,
-                            size: 22,
+              child: Consumer<CategoryProvider>(
+                builder: (context, categoryProvider, child) {
+                  final categories = categoryProvider.categories;
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: GestureDetector(
+                          onTap: () => _onCategoryTap(category),
+                          child: Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: category.bgColor,
+                                child: Icon(
+                                  category.icon,
+                                  color: category.iconColor,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                category.title,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          category['name'],
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),
@@ -391,12 +380,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 12),
 
-            Consumer3<ProductProvider, FruitProvider, CartProvider>(
-              builder: (context, productProvider, fruitProvider, cartProvider, _) {
-                final allProducts = [
-                  ...productProvider.vegetableProducts,
-                  ...fruitProvider.fruitProducts,
-                ];
+            // Sourced entirely from ProductProvider (Vegetables + Fruits)
+            Consumer2<ProductProvider, CartProvider>(
+              builder: (context, productProvider, cartProvider, _) {
+                final allProducts = productProvider.allProducts;
 
                 return GridView.builder(
                   shrinkWrap: true,
@@ -489,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ======================================================
-// PRODUCT CARD (Same UI as your old design)
+// PRODUCT CARD
 // ======================================================
 class _ProductCard extends StatelessWidget {
   final ProductItem product;
@@ -634,8 +621,6 @@ class _ProductCard extends StatelessWidget {
               ),
             ],
           ),
-
-          // Badge
           if (product.tag.isNotEmpty)
             Positioned(
               top: 10,
@@ -660,8 +645,6 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
             ),
-
-          // Favorite button
           Positioned(
             top: 10,
             right: 10,

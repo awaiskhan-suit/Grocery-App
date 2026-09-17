@@ -10,6 +10,7 @@ import '../providers/product_provider.dart';
 // ======================================================
 class ProductDetail {
   final String id;
+  final String categoryId;
   final String name;
   final String weight;
   final double price;
@@ -21,6 +22,7 @@ class ProductDetail {
 
   ProductDetail({
     required this.id,
+    required this.categoryId,
     required this.name,
     required this.weight,
     required this.price,
@@ -37,10 +39,11 @@ class ProductDetail {
 // ======================================================
 List<ProductDetail> allProductDetails = [
   // ====================================================
-  // VEGETABLES
+  // VEGETABLES (categoryId: c1)
   // ====================================================
   ProductDetail(
     id: 'v1',
+    categoryId: 'c1',
     name: 'Fresh Tomato',
     weight: '1 dozen',
     price: 8.00,
@@ -53,6 +56,7 @@ List<ProductDetail> allProductDetails = [
   ),
   ProductDetail(
     id: 'v2',
+    categoryId: 'c1',
     name: 'Onion',
     weight: '2.0 lbs',
     price: 7.00,
@@ -65,6 +69,7 @@ List<ProductDetail> allProductDetails = [
   ),
   ProductDetail(
     id: 'v3',
+    categoryId: 'c1',
     name: 'Potato',
     weight: '1.50 lbs',
     price: 9.90,
@@ -77,6 +82,7 @@ List<ProductDetail> allProductDetails = [
   ),
   ProductDetail(
     id: 'v4',
+    categoryId: 'c1',
     name: 'Carrot',
     weight: '5.0 lbs',
     price: 7.05,
@@ -89,10 +95,11 @@ List<ProductDetail> allProductDetails = [
   ),
 
   // ====================================================
-  // FRUITS
+  // FRUITS (categoryId: c2)
   // ====================================================
   ProductDetail(
     id: 'f1',
+    categoryId: 'c2',
     name: 'Fresh Peach',
     weight: 'dozen',
     price: 8.00,
@@ -105,10 +112,11 @@ List<ProductDetail> allProductDetails = [
   ),
   ProductDetail(
     id: 'f2',
+    categoryId: 'c2',
     name: 'Avocado',
     weight: '2.0 lbs',
     price: 7.00,
-    image: 'assets/images/Avocado.jpg',
+    image: 'assets/images/avocado.jpg',
     description:
     'Creamy and nutritious avocados. Rich in healthy fats and perfect for salads, toast, and smoothies.',
     rating: 4.8,
@@ -117,10 +125,11 @@ List<ProductDetail> allProductDetails = [
   ),
   ProductDetail(
     id: 'f3',
+    categoryId: 'c2',
     name: 'Pineapple',
     weight: '1.50 lbs',
     price: 9.90,
-    image: 'assets/images/pinaple.jpg',
+    image: 'assets/images/pineapple.jpg',
     description:
     'Tropical sweet pineapple full of vitamins. Great for juices, desserts, and fresh eating.',
     rating: 4.7,
@@ -160,7 +169,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadFavoriteStatus() async {
     final favoritesProvider = context.read<FavoritesProvider>();
 
-    // Ensure favorites are loaded from SharedPreferences
     await favoritesProvider.loadPersistedFavorites();
 
     if (!mounted) return;
@@ -201,9 +209,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final cartProvider = context.read<CartProvider>();
     final product = widget.product;
 
-    // Create a temporary ProductItem that CartProvider understands
     final ProductItem tempProduct = ProductItem(
       id: product.id,
+      categoryId: product.categoryId,
       name: product.name,
       weight: product.weight,
       price: product.price,
@@ -214,16 +222,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       category: '',
     );
 
-    // If item is already in cart → increment the required number of times
     if (cartProvider.isInCart(product.id)) {
       for (int i = 0; i < quantity; i++) {
         await cartProvider.incrementQuantity(product.id);
       }
     } else {
-      // First time adding
       await cartProvider.addToCart(tempProduct);
 
-      // If user selected more than 1, increment the rest
       for (int i = 1; i < quantity; i++) {
         await cartProvider.incrementQuantity(product.id);
       }

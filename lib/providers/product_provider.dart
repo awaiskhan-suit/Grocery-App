@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 class ProductItem {
   final String id;
+  final String categoryId;   // ← links to CategoryItem.id ('c1', 'c2', ...)
   final String name;
   final String weight;
   final double price;
@@ -13,7 +14,7 @@ class ProductItem {
   final String tag;
   final Color bgColor;
   final String description;
-  final String category;
+  final String category;     // kept for display/legacy use
 
   bool isFavorite;
   bool inCart;
@@ -21,6 +22,7 @@ class ProductItem {
 
   ProductItem({
     required this.id,
+    required this.categoryId,
     required this.name,
     required this.weight,
     required this.price,
@@ -36,28 +38,18 @@ class ProductItem {
 }
 
 // ======================================================
-// LEGACY TYPEDEFS
-// ======================================================
-
-typedef VegetableProduct = ProductItem;
-typedef FruitProduct = ProductItem;
-
-// ======================================================
-// PRODUCT PROVIDER
+// PRODUCT PROVIDER (single source of truth for all categories)
 // ======================================================
 
 class ProductProvider with ChangeNotifier {
-  // ======================================================
-  // PRODUCTS
-  // ======================================================
-
   final List<ProductItem> _productsList = [
     // --------------------------------------------------
-    // VEGETABLES
+    // VEGETABLES — categoryId: c1
     // --------------------------------------------------
 
     ProductItem(
       id: 'v1',
+      categoryId: 'c1',
       name: 'Tomato',
       weight: 'dozen',
       price: 8.00,
@@ -69,6 +61,7 @@ class ProductProvider with ChangeNotifier {
 
     ProductItem(
       id: 'v2',
+      categoryId: 'c1',
       name: 'Onion',
       weight: '2.0 lbs',
       price: 7.00,
@@ -80,6 +73,7 @@ class ProductProvider with ChangeNotifier {
 
     ProductItem(
       id: 'v3',
+      categoryId: 'c1',
       name: 'Potato',
       weight: '1.50 lbs',
       price: 9.90,
@@ -91,6 +85,7 @@ class ProductProvider with ChangeNotifier {
 
     ProductItem(
       id: 'v4',
+      categoryId: 'c1',
       name: 'Carrot',
       weight: '5.0 lbs',
       price: 7.05,
@@ -101,11 +96,12 @@ class ProductProvider with ChangeNotifier {
     ),
 
     // --------------------------------------------------
-    // FRUITS
+    // FRUITS — categoryId: c2
     // --------------------------------------------------
 
     ProductItem(
       id: 'f1',
+      categoryId: 'c2',
       name: 'Fresh Peach',
       weight: 'dozen',
       price: 8.00,
@@ -119,6 +115,7 @@ class ProductProvider with ChangeNotifier {
 
     ProductItem(
       id: 'f2',
+      categoryId: 'c2',
       name: 'Avocado',
       weight: '2.0 lbs',
       price: 7.00,
@@ -132,6 +129,7 @@ class ProductProvider with ChangeNotifier {
 
     ProductItem(
       id: 'f3',
+      categoryId: 'c2',
       name: 'Pineapple',
       weight: '1.50 lbs',
       price: 9.90,
@@ -150,33 +148,22 @@ class ProductProvider with ChangeNotifier {
 
   List<ProductItem> get allProducts => _productsList;
 
-  List<ProductItem> get vegetableProducts {
+  // ======================================================
+  // GET PRODUCTS BY CATEGORY ID  ← the key method for dynamic access
+  // ======================================================
+
+  List<ProductItem> getProductsByCategoryId(String categoryId) {
     return _productsList
-        .where((product) => product.category == 'Vegetables')
+        .where((product) => product.categoryId == categoryId)
         .toList();
   }
 
-  List<ProductItem> get fruitProducts {
-    return _productsList
-        .where((product) => product.category == 'Fruits')
-        .toList();
-  }
-
   // ======================================================
-  // SYNC FAVORITE STATUS
-  // ======================================================
-  //
-  // FavoritesProvider uses this method to synchronize
-  // the favorite state of ProductItem objects.
-  //
+  // CHECK IF CATEGORY HAS PRODUCTS
   // ======================================================
 
-  void syncFavoriteStatus(Set<String> favoriteIds) {
-    for (final product in _productsList) {
-      product.isFavorite = favoriteIds.contains(product.id);
-    }
-
-    notifyListeners();
+  bool hasProductsForCategory(String categoryId) {
+    return _productsList.any((product) => product.categoryId == categoryId);
   }
 
   // ======================================================
@@ -185,23 +172,25 @@ class ProductProvider with ChangeNotifier {
 
   ProductItem? getProductById(String id) {
     try {
-      return _productsList.firstWhere(
-            (product) => product.id == id,
-      );
+      return _productsList.firstWhere((product) => product.id == id);
     } catch (_) {
       return null;
     }
   }
 
   // ======================================================
-  // SYNC CART STATUS
+  // SYNC FAVORITE STATUS
   // ======================================================
-  //
-  // CartProvider uses this method to synchronize the
-  // inCart and quantity values of ProductItem objects.
-  //
-  // ProductProvider does NOT manage the cart.
-  //
+
+  void syncFavoriteStatus(Set<String> favoriteIds) {
+    for (final product in _productsList) {
+      product.isFavorite = favoriteIds.contains(product.id);
+    }
+    notifyListeners();
+  }
+
+  // ======================================================
+  // SYNC CART STATUS
   // ======================================================
 
   void syncCartStatus(
@@ -217,7 +206,6 @@ class ProductProvider with ChangeNotifier {
         product.quantity = 1;
       }
     }
-
     notifyListeners();
   }
 }

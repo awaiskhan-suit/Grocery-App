@@ -4,24 +4,29 @@ import 'package:provider/provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/product_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/category_provider.dart';
 import 'product_detail_screen.dart';
 
-class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({Key? key}) : super(key: key);
+class CategoryProductsScreen extends StatefulWidget {
+  final CategoryItem category;
+
+  const CategoryProductsScreen({
+    Key? key,
+    required this.category,
+  }) : super(key: key);
 
   @override
-  State<ProductsScreen> createState() => _ProductsScreenState();
+  State<CategoryProductsScreen> createState() =>
+      _CategoryProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
+class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
-
   String _searchText = '';
 
   @override
   void initState() {
     super.initState();
-
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text.trim().toLowerCase();
@@ -35,15 +40,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
     super.dispose();
   }
 
-  // ============================================================
+  // ======================================================
   // SNACKBAR
-  // ============================================================
-
+  // ======================================================
   void _showSnackBar(String message, Color bgColor) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -56,25 +58,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
         backgroundColor: bgColor,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
-  // ============================================================
-  // NAVIGATE TO PRODUCT DETAILS
-  // ============================================================
-
+  // ======================================================
+  // NAVIGATE TO PRODUCT DETAIL (matched by id, not name)
+  // ======================================================
   Future<void> _navigateToProductDetail(ProductItem product) async {
     ProductDetail? selectedProduct;
 
     try {
       selectedProduct = allProductDetails.firstWhere(
-            (p) =>
-        p.name.trim().toLowerCase() ==
-            product.name.trim().toLowerCase(),
+            (p) => p.id == product.id,
       );
     } catch (_) {
       selectedProduct = null;
@@ -91,26 +88,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductDetailScreen(
-          product: selectedProduct!,
-        ),
+        builder: (_) => ProductDetailScreen(product: selectedProduct!),
       ),
     );
   }
 
-  // ============================================================
+  // ======================================================
   // TOGGLE FAVORITE
-  // ============================================================
-
+  // ======================================================
   Future<void> _toggleFavorite(ProductItem product) async {
     final favoritesProvider = context.read<FavoritesProvider>();
-
     await favoritesProvider.toggleFavoriteById(product.id);
-
     if (!mounted) return;
 
     final bool isFavorite = favoritesProvider.isFavorite(product.id);
-
     _showSnackBar(
       isFavorite
           ? '${product.name} added to favorites'
@@ -119,64 +110,40 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  // ============================================================
+  // ======================================================
   // ADD TO CART
-  // ============================================================
-
+  // ======================================================
   Future<void> _addToCart(ProductItem product) async {
     final cartProvider = context.read<CartProvider>();
-
     await cartProvider.addToCart(product);
-
     if (!mounted) return;
-
-    _showSnackBar(
-      '${product.name} added to the cart',
-      Colors.green,
-    );
+    _showSnackBar('${product.name} added to the cart', Colors.green);
   }
 
-  // ============================================================
-  // INCREASE QUANTITY
-  // ============================================================
-
+  // ======================================================
+  // INCREMENT / DECREMENT
+  // ======================================================
   Future<void> _incrementQuantity(String productId) async {
     final cartProvider = context.read<CartProvider>();
     await cartProvider.incrementQuantity(productId);
   }
 
-  // ============================================================
-  // DECREASE QUANTITY
-  // ============================================================
-
   Future<void> _decrementQuantity(ProductItem product) async {
     final cartProvider = context.read<CartProvider>();
-
-    final bool wasRemoved =
-    await cartProvider.decrementQuantity(product.id);
-
+    final bool wasRemoved = await cartProvider.decrementQuantity(product.id);
     if (!mounted) return;
-
     if (wasRemoved) {
-      _showSnackBar(
-        '${product.name} removed from the cart',
-        Colors.redAccent,
-      );
+      _showSnackBar('${product.name} removed from the cart', Colors.redAccent);
     }
   }
 
-  // ============================================================
+  // ======================================================
   // BUILD
-  // ============================================================
-
+  // ======================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-
-      // ========================================================
-      // APP BAR
-      // ========================================================
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.green,
@@ -185,45 +152,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text(
-          'Vegetables',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+        title: Text(
+          widget.category.title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
       ),
-
-      // ========================================================
-      // BODY
-      // ========================================================
       body: Column(
         children: [
-          // ======================================================
+          // ==================================================
           // SEARCH BAR
-          // ======================================================
+          // ==================================================
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search vegetables...',
-                hintStyle: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 14,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: Colors.grey[400],
-                ),
+                hintText: 'Search ${widget.category.title.toLowerCase()}...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
                 suffixIcon: _searchText.isNotEmpty
                     ? IconButton(
                   icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                  },
+                  onPressed: () => _searchController.clear(),
                 )
                     : null,
                 filled: true,
@@ -237,9 +189,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
 
-          // ======================================================
+          // ==================================================
           // PRODUCTS GRID
-          // ======================================================
+          // ==================================================
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -253,14 +205,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     child,
                     ) {
                   // ------------------------------------------------
-                  // GET VEGETABLES
+                  // GET PRODUCTS FOR THIS CATEGORY (by id)
                   // ------------------------------------------------
-                  final allVegetables = productProvider.vegetableProducts;
+                  final allCategoryProducts = productProvider
+                      .getProductsByCategoryId(widget.category.id);
 
                   // ------------------------------------------------
                   // SEARCH FILTER
                   // ------------------------------------------------
-                  final vegetableProducts = allVegetables.where((product) {
+                  final products = allCategoryProducts.where((product) {
                     if (_searchText.isEmpty) return true;
                     return product.name.toLowerCase().contains(_searchText);
                   }).toList();
@@ -268,14 +221,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   // ------------------------------------------------
                   // EMPTY RESULT
                   // ------------------------------------------------
-                  if (vegetableProducts.isEmpty) {
-                    return const Center(
+                  if (products.isEmpty) {
+                    return Center(
                       child: Text(
-                        'No vegetables found',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
+                        'No ${widget.category.title.toLowerCase()} found',
+                        style: const TextStyle(fontSize: 16, color: Colors.grey),
                       ),
                     );
                   }
@@ -285,7 +235,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   // ------------------------------------------------
                   return GridView.builder(
                     padding: const EdgeInsets.only(top: 12, bottom: 20),
-                    itemCount: vegetableProducts.length,
+                    itemCount: products.length,
                     gridDelegate:
                     const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -294,12 +244,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       childAspectRatio: 0.70,
                     ),
                     itemBuilder: (context, index) {
-                      final product = vegetableProducts[index];
+                      final product = products[index];
 
                       final bool isFavorite =
                       favoritesProvider.isFavorite(product.id);
-                      final bool isInCart =
-                      cartProvider.isInCart(product.id);
+                      final bool isInCart = cartProvider.isInCart(product.id);
                       final int quantity =
                       cartProvider.getQuantity(product.id);
 
@@ -506,7 +455,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                             'Add to cart',
                                             style: TextStyle(
                                               fontSize: 11,
-                                              fontWeight: FontWeight.w600,
+                                              fontWeight:
+                                              FontWeight.w600,
                                             ),
                                           ),
                                         ],
@@ -530,4 +480,3 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 }
-

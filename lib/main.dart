@@ -27,9 +27,7 @@ void main() async {
         ),
 
         // Fruit Provider
-        ChangeNotifierProvider(
-          create: (_) => FruitProvider(),
-        ),
+
 
         // Favorites Provider
         ChangeNotifierProvider(
