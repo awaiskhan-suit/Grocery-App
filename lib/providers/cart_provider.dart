@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'product_provider.dart';
+import 'products_provider.dart';
 
 class CartProvider extends ChangeNotifier {
   static const String _prefsKey = 'saved_cart_items';

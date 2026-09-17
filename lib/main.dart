@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:grocery/splashes/on_boarding_screen.dart';
 
 // Providers
-import 'providers/product_provider.dart';
+import 'providers/products_provider.dart';
 import 'providers/fruit_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/cart_provider.dart'; // ← Added
@@ -39,7 +39,7 @@ void main() async {
           create: (_) => CartProvider(),
         ),
 
-        ChangeNotifierProvider(create: (_) => CategoryProvider()),
+        ChangeNotifierProvider(create: (_) => ProductProvider()),
       ],
       child: const MyApp(),
     ),

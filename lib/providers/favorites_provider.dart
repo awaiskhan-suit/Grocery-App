@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'product_provider.dart';
+import 'products_provider.dart';
 
 class FavoritesProvider extends ChangeNotifier {
   // ======================================================

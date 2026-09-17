@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/favorites_provider.dart';
 import 'product_detail_screen.dart';
-import '../providers/product_provider.dart';
+import '../providers/products_provider.dart';
 
 class FavoritesScreen extends StatefulWidget {
   final VoidCallback onFavoriteChanged;

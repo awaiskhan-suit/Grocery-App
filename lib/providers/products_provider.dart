@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 class ProductItem {
   final String id;
-  final String categoryId;   // ← links to CategoryItem.id ('c1', 'c2', ...)
+  final String categoryId;   // 'c1', 'c2', ...
   final String name;
   final String weight;
   final double price;
@@ -14,7 +14,7 @@ class ProductItem {
   final String tag;
   final Color bgColor;
   final String description;
-  final String category;     // kept for display/legacy use
+  final String category;
 
   bool isFavorite;
   bool inCart;
@@ -38,7 +38,8 @@ class ProductItem {
 }
 
 // ======================================================
-// PRODUCT PROVIDER (single source of truth for all categories)
+// PRODUCT PROVIDER  (single source of truth)
+// Supports "family" style access by categoryId
 // ======================================================
 
 class ProductProvider with ChangeNotifier {
@@ -46,7 +47,6 @@ class ProductProvider with ChangeNotifier {
     // --------------------------------------------------
     // VEGETABLES — categoryId: c1
     // --------------------------------------------------
-
     ProductItem(
       id: 'v1',
       categoryId: 'c1',
@@ -58,7 +58,6 @@ class ProductProvider with ChangeNotifier {
       bgColor: const Color(0xFFFFEBEE),
       category: 'Vegetables',
     ),
-
     ProductItem(
       id: 'v2',
       categoryId: 'c1',
@@ -70,7 +69,6 @@ class ProductProvider with ChangeNotifier {
       bgColor: const Color(0xFFE8F5E9),
       category: 'Vegetables',
     ),
-
     ProductItem(
       id: 'v3',
       categoryId: 'c1',
@@ -82,7 +80,6 @@ class ProductProvider with ChangeNotifier {
       bgColor: const Color(0xFFFFFDE7),
       category: 'Vegetables',
     ),
-
     ProductItem(
       id: 'v4',
       categoryId: 'c1',
@@ -98,7 +95,6 @@ class ProductProvider with ChangeNotifier {
     // --------------------------------------------------
     // FRUITS — categoryId: c2
     // --------------------------------------------------
-
     ProductItem(
       id: 'f1',
       categoryId: 'c2',
@@ -112,7 +108,6 @@ class ProductProvider with ChangeNotifier {
       'Fresh and juicy organic peaches picked directly from the farm. Rich in vitamins and natural sweetness.',
       category: 'Fruits',
     ),
-
     ProductItem(
       id: 'f2',
       categoryId: 'c2',
@@ -126,7 +121,6 @@ class ProductProvider with ChangeNotifier {
       'Creamy, fresh Hass avocados packed with healthy fats and essential nutrients. Perfect for salads and toast.',
       category: 'Fruits',
     ),
-
     ProductItem(
       id: 'f3',
       categoryId: 'c2',
@@ -146,30 +140,29 @@ class ProductProvider with ChangeNotifier {
   // GETTERS
   // ======================================================
 
-  List<ProductItem> get allProducts => _productsList;
+  /// All products (used on Home Screen)
+  List<ProductItem> get allProducts => List.unmodifiable(_productsList);
 
   // ======================================================
-  // GET PRODUCTS BY CATEGORY ID  ← the key method for dynamic access
+  // FAMILY-STYLE ACCESS  ← main method you asked for
   // ======================================================
 
+  /// Get products by categoryId (family style)
+  /// Example:
+  ///   getProductsByCategoryId('c1') → Vegetables
+  ///   getProductsByCategoryId('c2') → Fruits
   List<ProductItem> getProductsByCategoryId(String categoryId) {
     return _productsList
         .where((product) => product.categoryId == categoryId)
         .toList();
   }
 
-  // ======================================================
-  // CHECK IF CATEGORY HAS PRODUCTS
-  // ======================================================
-
+  /// Check if a category has any products
   bool hasProductsForCategory(String categoryId) {
     return _productsList.any((product) => product.categoryId == categoryId);
   }
 
-  // ======================================================
-  // FIND PRODUCT BY ID
-  // ======================================================
-
+  /// Find single product by id
   ProductItem? getProductById(String id) {
     try {
       return _productsList.firstWhere((product) => product.id == id);
@@ -179,7 +172,7 @@ class ProductProvider with ChangeNotifier {
   }
 
   // ======================================================
-  // SYNC FAVORITE STATUS
+  // SYNC METHODS
   // ======================================================
 
   void syncFavoriteStatus(Set<String> favoriteIds) {
@@ -188,10 +181,6 @@ class ProductProvider with ChangeNotifier {
     }
     notifyListeners();
   }
-
-  // ======================================================
-  // SYNC CART STATUS
-  // ======================================================
 
   void syncCartStatus(
       Set<String> cartIds,

@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../categories/fruits_screen.dart';
+import '../categories/vegetables_screen.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../providers/product_provider.dart';
 import '../providers/category_provider.dart';
-import 'category_product_screen.dart';
+import '../providers/products_provider.dart';
+import '../widgets/product_card.dart'; // ← added
+
 import 'product_detail_screen.dart';
 import 'categories_screen.dart';
 import 'favorites.dart';
@@ -177,12 +180,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final productProvider = context.read<ProductProvider>();
     final products = productProvider.getProductsByCategoryId(category.id);
 
-    if (products.isNotEmpty) {
+    if (products.isEmpty) {
+      _showSnackBar('${category.title} coming soon!', Colors.orange);
+      return;
+    }
+
+    // Directly open the correct product screen
+    if (category.id == 'c1') {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => CategoryProductsScreen(category: category), // ← fixed
-        ),
+        MaterialPageRoute(builder: (_) => const VegetablesScreen()),
+      );
+    } else if (category.id == 'c2') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FruitsScreen()),
       );
     } else {
       _showSnackBar('${category.title} coming soon!', Colors.orange);
@@ -308,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const CategorySelectionScreen(),
+                        builder: (_) => const CategoryScreen(),
                       ),
                     );
                   },
@@ -319,51 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 12),
 
-            // Quick-access category row, driven by CategoryProvider
-            SizedBox(
-              height: 80,
-              child: Consumer<CategoryProvider>(
-                builder: (context, categoryProvider, child) {
-                  final categories = categoryProvider.categories;
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: categories.length,
-                    itemBuilder: (context, index) {
-                      final category = categories[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 16.0),
-                        child: GestureDetector(
-                          onTap: () => _onCategoryTap(category),
-                          child: Column(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: category.bgColor,
-                                child: Icon(
-                                  category.icon,
-                                  color: category.iconColor,
-                                  size: 22,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                category.title,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
+            // Quick-access category row
             const SizedBox(height: 20),
 
             // ====================== FEATURED PRODUCTS ======================
@@ -380,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 12),
 
-            // Sourced entirely from ProductProvider (Vegetables + Fruits)
+            // All products from ProductProvider (family style)
             Consumer2<ProductProvider, CartProvider>(
               builder: (context, productProvider, cartProvider, _) {
                 final allProducts = productProvider.allProducts;
@@ -402,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     final bool inCart = cartProvider.isInCart(product.id);
                     final int quantity = cartProvider.getQuantity(product.id);
 
-                    return _ProductCard(
+                    return ProductCard( // ← changed from _ProductCard
                       product: product,
                       isFavorite: isFavorite,
                       inCart: inCart,
