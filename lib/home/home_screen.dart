@@ -10,8 +10,8 @@ import '../providers/category_provider.dart';
 import '../providers/products_provider.dart';
 import '../widgets/product_card.dart'; // ← added
 
+import 'category_dashboard.dart';
 import 'product_detail_screen.dart';
-import 'categories_screen.dart';
 import 'favorites.dart';
 import 'shopping_cart.dart';
 import 'package:grocery/home/profile.dart';
@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const CategoryScreen(),
+                        builder: (_) => const CategoryScreenDashboard(),
                       ),
                     );
                   },
